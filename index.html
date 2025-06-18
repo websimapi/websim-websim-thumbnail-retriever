@@ -82,36 +82,47 @@
     </div>
 
     <script type="module">
+        /**
+         * Parses a Websim URL and attempts to retrieve its thumbnail URL.
+         * @param {string} websimUrl The full URL of the Websim project or site.
+         * @returns {Promise<{type: 'found', url: string}|{type: 'no_screenshot'}|{type: 'unrecognized_url'}>} An object indicating the result.
+         */
         async function getWebsimThumbnailUrl(websimUrl) {
             try {
                 const url = new URL(websimUrl);
                 const pathSegments = url.pathname.split('/').filter(s => s);
 
+                // Handle site URLs: websim.com/c/{site_id}
                 if (pathSegments[0] === 'c' && pathSegments[1]) {
-                    // It's a site URL: websim.com/c/{site_id}
                     const siteId = pathSegments[1];
-                    return `https://images.websim.com/v1/site/${siteId}/600`;
-                } else if (pathSegments[0] === 'p' && pathSegments[1]) {
-                    // It's a project URL: websim.com/p/{project_id}
+                    return { type: 'found', url: `https://images.websim.com/v1/site/${siteId}/600` };
+                } 
+                // Handle project URLs by ID: websim.com/p/{project_id}
+                else if (pathSegments[0] === 'p' && pathSegments[1]) {
                     const projectId = pathSegments[1];
                     const { project_revision } = await window.websim.getProject(projectId);
                     if (project_revision && project_revision.current_screenshot_url) {
-                        return project_revision.current_screenshot_url;
+                        return { type: 'found', url: project_revision.current_screenshot_url };
+                    } else {
+                        return { type: 'no_screenshot' };
                     }
-                } else if (pathSegments[0] && pathSegments[0].startsWith('@') && pathSegments[1]) {
-                    // It's a user slug project URL: websim.com/@{username}/{slug}
+                } 
+                // Handle user slug project URLs: websim.com/@{username}/{slug}
+                else if (pathSegments[0] && pathSegments[0].startsWith('@') && pathSegments[1]) {
                     const username = pathSegments[0].substring(1); // remove '@'
                     const slug = pathSegments[1];
                     const { project_revision } = await window.websim.getProjectBySlug(username, slug);
                     if (project_revision && project_revision.current_screenshot_url) {
-                        return project_revision.current_screenshot_url;
+                        return { type: 'found', url: project_revision.current_screenshot_url };
+                    } else {
+                        return { type: 'no_screenshot' };
                     }
                 }
             } catch (error) {
                 console.error("Error retrieving thumbnail:", error);
                 throw new Error("Invalid URL or failed to fetch project/site data.");
             }
-            return null; // Return null if URL is not recognized or no thumbnail found
+            return { type: 'unrecognized_url' }; // Return if URL pattern is not recognized
         }
 
         document.getElementById('getThumbnailButton').addEventListener('click', async () => {
@@ -128,11 +139,13 @@
             }
 
             try {
-                const thumbnailUrl = await getWebsimThumbnailUrl(inputUrl);
-                if (thumbnailUrl) {
-                    thumbnailDisplay.innerHTML = `<img src="${thumbnailUrl}" alt="Websim Thumbnail">`;
-                } else {
-                    thumbnailDisplay.innerHTML = '<p>No thumbnail found for this URL or URL not recognized as a Websim project/site.</p>';
+                const result = await getWebsimThumbnailUrl(inputUrl);
+                if (result.type === 'found') {
+                    thumbnailDisplay.innerHTML = `<img src="${result.url}" alt="Websim Thumbnail">`;
+                } else if (result.type === 'no_screenshot') {
+                    thumbnailDisplay.innerHTML = '<p>No screenshot available for this project/site.</p>';
+                } else if (result.type === 'unrecognized_url') {
+                    thumbnailDisplay.innerHTML = '<p>URL not recognized as a Websim project/site.</p>';
                 }
             } catch (error) {
                 thumbnailDisplay.innerHTML = '<p>Error loading thumbnail.</p>';
@@ -143,4 +156,3 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
