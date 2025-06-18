@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Websim Thumbnail Retriever</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #thumbnailDisplay {
+            margin-top: 20px;
+            border: 1px dashed #ccc;
+            padding: 15px;
+            min-height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        #thumbnailDisplay img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #thumbnailDisplay p {
+            color: #666;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Websim Thumbnail Retriever</h1>
+        <p>Enter a Websim project or site URL to get its thumbnail image.</p>
+        <input type="text" id="websimUrlInput" placeholder="e.g., https://websim.com/c/someSiteId or https://websim.com/p/someProjectId">
+        <button id="getThumbnailButton">Get Thumbnail</button>
+        <div id="thumbnailDisplay">
+            <p>Thumbnail will appear here.</p>
+        </div>
+        <p class="error" id="errorMessage"></p>
+    </div>
+
+    <script type="module">
+        async function getWebsimThumbnailUrl(websimUrl) {
+            try {
+                const url = new URL(websimUrl);
+                const pathSegments = url.pathname.split('/').filter(s => s);
+
+                if (pathSegments[0] === 'c' && pathSegments[1]) {
+                    // It's a site URL: websim.com/c/{site_id}
+                    const siteId = pathSegments[1];
+                    return `https://images.websim.com/v1/site/${siteId}/600`;
+                } else if (pathSegments[0] === 'p' && pathSegments[1]) {
+                    // It's a project URL: websim.com/p/{project_id}
+                    const projectId = pathSegments[1];
+                    const { project_revision } = await window.websim.getProject(projectId);
+                    if (project_revision && project_revision.current_screenshot_url) {
+                        return project_revision.current_screenshot_url;
+                    }
+                } else if (pathSegments[0] && pathSegments[0].startsWith('@') && pathSegments[1]) {
+                    // It's a user slug project URL: websim.com/@{username}/{slug}
+                    const username = pathSegments[0].substring(1); // remove '@'
+                    const slug = pathSegments[1];
+                    const { project_revision } = await window.websim.getProjectBySlug(username, slug);
+                    if (project_revision && project_revision.current_screenshot_url) {
+                        return project_revision.current_screenshot_url;
+                    }
+                }
+            } catch (error) {
+                console.error("Error retrieving thumbnail:", error);
+                throw new Error("Invalid URL or failed to fetch project/site data.");
+            }
+            return null; // Return null if URL is not recognized or no thumbnail found
+        }
+
+        document.getElementById('getThumbnailButton').addEventListener('click', async () => {
+            const inputUrl = document.getElementById('websimUrlInput').value;
+            const thumbnailDisplay = document.getElementById('thumbnailDisplay');
+            const errorMessage = document.getElementById('errorMessage');
+
+            thumbnailDisplay.innerHTML = '<p>Loading...</p>';
+            errorMessage.textContent = '';
+
+            if (!inputUrl) {
+                thumbnailDisplay.innerHTML = '<p>Please enter a URL.</p>';
+                return;
+            }
+
+            try {
+                const thumbnailUrl = await getWebsimThumbnailUrl(inputUrl);
+                if (thumbnailUrl) {
+                    thumbnailDisplay.innerHTML = `<img src="${thumbnailUrl}" alt="Websim Thumbnail">`;
+                } else {
+                    thumbnailDisplay.innerHTML = '<p>No thumbnail found for this URL or URL not recognized as a Websim project/site.</p>';
+                }
+            } catch (error) {
+                thumbnailDisplay.innerHTML = '<p>Error loading thumbnail.</p>';
+                errorMessage.textContent = error.message;
+            }
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
